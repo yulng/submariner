@@ -25,6 +25,7 @@ import (
 	v1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/cable"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
+	"github.com/submariner-io/submariner/pkg/pod"
 	"github.com/submariner-io/submariner/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
@@ -67,16 +68,25 @@ type engine struct {
 	natEndpointInfoCh   chan *natdiscovery.NATEndpointInfo
 	natDiscoveryPending map[string]int
 	installedCables     map[string]metav1.Time
+	gatewayPod          pod.GatewayPodInterface
 }
 
 // NewEngine creates a new Engine for the local cluster
-func NewEngine(localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint) Engine {
+func NewEngine(localCluster types.SubmarinerCluster, localEndpoint types.SubmarinerEndpoint,
+	gwPod pod.GatewayPodInterface) (Engine, error) {
+	if gwPod != nil {
+		if err := gwPod.SetHALabels(v1.HAStatusPassive); err != nil {
+			return nil, err
+		}
+	}
+
 	return &engine{
 		localCluster:        localCluster,
 		localEndpoint:       localEndpoint,
 		natDiscoveryPending: map[string]int{},
 		installedCables:     map[string]metav1.Time{},
-	}
+		gatewayPod:          gwPod,
+	}, nil
 }
 
 func (i *engine) GetLocalEndpoint() *types.SubmarinerEndpoint {
@@ -89,6 +99,12 @@ func (i *engine) StartEngine() error {
 
 	if err := i.startDriver(); err != nil {
 		return err
+	}
+
+	if i.gatewayPod != nil {
+		if err := i.gatewayPod.SetHALabels(v1.HAStatusActive); err != nil {
+			return err
+		}
 	}
 
 	klog.Infof("CableEngine controller started, driver: %q", i.driver.GetName())

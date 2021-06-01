@@ -57,6 +57,7 @@ var _ = Describe("Cable Engine", func() {
 		natDiscovery   *fakeNATDiscovery
 		localEndpoint  *subv1.Endpoint
 		remoteEndpoint *subv1.Endpoint
+		gatewayPod     *fakeGatewayPod
 		skipStart      bool
 	)
 
@@ -90,12 +91,19 @@ var _ = Describe("Cable Engine", func() {
 		}
 
 		fakeDriver = fake.New()
-		engine = cableengine.NewEngine(types.SubmarinerCluster{
+		gatewayPod = newFakeGatewayPod()
+
+		var err error
+
+		engine, err = cableengine.NewEngine(types.SubmarinerCluster{
 			ID: localClusterID,
 			Spec: subv1.ClusterSpec{
 				ClusterID: localClusterID,
 			},
-		}, types.SubmarinerEndpoint{Spec: localEndpoint.Spec})
+		}, types.SubmarinerEndpoint{Spec: localEndpoint.Spec},
+			gatewayPod)
+
+		Expect(err).NotTo(HaveOccurred())
 
 		natDiscovery = &fakeNATDiscovery{removeEndpoint: make(chan string, 20), readyChannel: make(chan *natdiscovery.NATEndpointInfo, 100)}
 		engine.SetupNATDiscovery(natDiscovery)
@@ -316,6 +324,7 @@ var _ = Describe("Cable Engine", func() {
 	When("the HA status is queried", func() {
 		It("should return active", func() {
 			Expect(engine.GetHAStatus()).To(Equal(subv1.HAStatusActive))
+			Expect(gatewayPod.HAStatus).To(Equal(subv1.HAStatusActive))
 		})
 	})
 
@@ -336,6 +345,7 @@ var _ = Describe("Cable Engine", func() {
 		Context("and the HA status is queried", func() {
 			It("should return passive", func() {
 				Expect(engine.GetHAStatus()).To(Equal(subv1.HAStatusPassive))
+				Expect(gatewayPod.HAStatus).To(Equal(subv1.HAStatusPassive))
 			})
 		})
 
@@ -389,4 +399,17 @@ func natEndpointInfoFor(endpoint *subv1.Endpoint) *natdiscovery.NATEndpointInfo 
 		UseNAT:   true,
 		Endpoint: *endpoint,
 	}
+}
+
+type fakeGatewayPod struct {
+	HAStatus subv1.HAStatus
+}
+
+func (gp *fakeGatewayPod) SetHALabels(status subv1.HAStatus) error {
+	gp.HAStatus = status
+	return nil
+}
+
+func newFakeGatewayPod() *fakeGatewayPod {
+	return &fakeGatewayPod{}
 }

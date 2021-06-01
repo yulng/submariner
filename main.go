@@ -32,6 +32,7 @@ import (
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/syncer/broker"
 	"github.com/submariner-io/admiral/pkg/watcher"
+	"github.com/submariner-io/submariner/pkg/pod"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -83,6 +84,7 @@ const (
 
 var VERSION = "not-compiled-properly"
 
+// nolint:gocyclo // the main function has a lot of error checking that increases cyclomatic complexity
 func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -131,7 +133,16 @@ func main() {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
 	}
 
-	cableEngine := cableengine.NewEngine(localCluster, localEndpoint)
+	gwPod, err := pod.NewGatewayPod(k8sClient)
+	if err != nil {
+		klog.Fatalf("Error creating a handler to update the gateway pod: %v", err)
+	}
+
+	cableEngine, err := cableengine.NewEngine(localCluster, localEndpoint, gwPod)
+	if err != nil {
+		klog.Fatalf("Error creating cable engine: %s", err)
+	}
+
 	natDiscovery, err := natdiscovery.New(&localEndpoint)
 	if err != nil {
 		klog.Fatalf("Error creating the NAT discovery handler %s", err)

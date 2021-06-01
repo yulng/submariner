@@ -101,11 +101,12 @@ var _ = Describe("Managing tunnels", func() {
 	})
 
 	JustBeforeEach(func() {
-		engine := cableengine.NewEngine(types.SubmarinerCluster{}, types.SubmarinerEndpoint{
+		engine, err := cableengine.NewEngine(types.SubmarinerCluster{}, types.SubmarinerEndpoint{
 			Spec: v1.EndpointSpec{
 				Backend: fake.DriverName,
 			},
-		})
+		}, nil)
+		Expect(err).To(Succeed())
 
 		nat, err := natdiscovery.New(&types.SubmarinerEndpoint{})
 		Expect(err).To(Succeed())
