@@ -6,10 +6,11 @@ require (
 	github.com/cenk/hub v1.0.1 // indirect
 	github.com/coreos/go-iptables v0.6.0
 	github.com/ebay/go-ovn v0.1.1-0.20210414223409-7376ba97f8cd
+	github.com/emirpasic/gods v1.12.0
 	github.com/go-ping/ping v0.0.0-20210407214646-e4e642a95741
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/onsi/ginkgo v1.16.2
-	github.com/onsi/gomega v1.12.0
+	github.com/onsi/gomega v1.13.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/submariner-io/admiral v0.10.0-m1
