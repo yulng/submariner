@@ -47,8 +47,7 @@ type Interface interface {
 	RouteGet(destination net.IP) ([]netlink.Route, error)
 	RouteList(link netlink.Link, family int) ([]netlink.Route, error)
 	FlushRouteTable(tableID int) error
-	RuleAdd(rule *netlink.Rule) error
-	RuleDel(rule *netlink.Rule) error
+	ConfigureIPRule(operation Operation, tableID int) error
 	XfrmPolicyAdd(policy *netlink.XfrmPolicy) error
 	XfrmPolicyDel(policy *netlink.XfrmPolicy) error
 	XfrmPolicyList(family int) ([]netlink.XfrmPolicy, error)
@@ -60,6 +59,13 @@ var NewFunc func() Interface
 
 const (
 	allZeroAddress = "0.0.0.0/0"
+)
+
+type Operation int
+
+const (
+	Add Operation = iota
+	Delete
 )
 
 type netlinkType struct{}
@@ -116,12 +122,25 @@ func (n *netlinkType) RouteList(link netlink.Link, family int) ([]netlink.Route,
 	return netlink.RouteList(link, family)
 }
 
-func (n *netlinkType) RuleAdd(rule *netlink.Rule) error {
-	return netlink.RuleAdd(rule)
-}
+func (n *netlinkType) ConfigureIPRule(operation Operation, tableID int) error {
+	rule := netlink.NewRule()
+	rule.Table = tableID
+	rule.Priority = tableID
 
-func (n *netlinkType) RuleDel(rule *netlink.Rule) error {
-	return netlink.RuleDel(rule)
+	switch operation {
+	case Add:
+		err := netlink.RuleAdd(rule)
+		if err != nil && !os.IsExist(err) {
+			return errors.Wrapf(err, "failed to add ip rule %s", rule)
+		}
+	case Delete:
+		err := netlink.RuleDel(rule)
+		if err != nil && !os.IsNotExist(err) {
+			return errors.Wrapf(err, "failed to delete ip rule %s", rule)
+		}
+	}
+
+	return nil
 }
 
 func (n *netlinkType) XfrmPolicyAdd(policy *netlink.XfrmPolicy) error {

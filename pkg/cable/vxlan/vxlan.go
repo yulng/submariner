@@ -140,7 +140,7 @@ func (v *vxlan) createVxlanInterface(activeEndPoint string, port int) error {
 
 	v.vxlanIface.vtepIP = vtepIP
 
-	err = v.configureIPRule(Add)
+	err = v.netLink.ConfigureIPRule(netlinkAPI.Add, TableID)
 	if err != nil && !os.IsExist(err) {
 		return errors.Wrap(err, "failed to add ip rule")
 	}
@@ -255,32 +255,6 @@ func (v *vxlan) getVxlanVtepIPAddress(ipAddr string) (net.IP, error) {
 	vxlanIP := net.ParseIP(strings.Join(ipSlice, "."))
 
 	return vxlanIP, nil
-}
-
-func (v *vxlan) configureIPRule(operation Operation) error {
-	if v.vxlanIface == nil {
-		return nil
-	}
-
-	rule := netlink.NewRule()
-	rule.Table = TableID
-	rule.Priority = TableID
-
-	switch operation {
-	case Add:
-		err := netlink.RuleAdd(rule)
-		if err != nil && !os.IsExist(err) {
-			return errors.Wrapf(err, "failed to add ip rule %s", rule)
-		}
-	case Delete:
-		err := netlink.RuleDel(rule)
-		if err != nil && !os.IsNotExist(err) {
-			return errors.Wrapf(err, "failed to delete ip rule %s", rule)
-		}
-	case Flush:
-	}
-
-	return nil
 }
 
 func (v *vxlan) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
@@ -571,10 +545,10 @@ func (v *vxlan) Cleanup() error {
 
 	err := netlinkAPI.DeleteIfaceAndAssociatedRoutes(VxlanIface, TableID)
 	if err != nil {
-		return errors.Wrapf(err, "unable to delete interface %s and associated routes from table %d", VxlanIface, TableID)
+		klog.Errorf("unable to delete interface %s and associated routes from table %d", VxlanIface, TableID)
 	}
 
-	err = v.configureIPRule(Delete)
+	err = v.netLink.ConfigureIPRule(netlinkAPI.Delete, TableID)
 	if err != nil {
 		return errors.Wrapf(err, "unable to delete IP rule pointing to %d table", TableID)
 	}

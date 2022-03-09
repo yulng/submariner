@@ -26,6 +26,7 @@ import (
 	"syscall"
 
 	. "github.com/onsi/gomega"
+	netlinkAPI "github.com/submariner-io/submariner/pkg/netlink"
 	"github.com/vishvananda/netlink"
 )
 
@@ -189,28 +190,28 @@ func (n *NetLink) RouteList(link netlink.Link, family int) ([]netlink.Route, err
 	return n.routes[link.Attrs().Index], nil
 }
 
-func (n *NetLink) RuleAdd(rule *netlink.Rule) error {
+func (n *NetLink) ConfigureIPRule(operation netlinkAPI.Operation, tableID int) error {
 	n.mutex.Lock()
 	defer n.mutex.Unlock()
 
-	if _, found := n.rules[rule.Table]; found {
-		return os.ErrExist
+	rule := netlink.NewRule()
+	rule.Table = tableID
+	rule.Priority = tableID
+
+	switch operation {
+	case netlinkAPI.Add:
+		if _, found := n.rules[rule.Table]; found {
+			return os.ErrExist
+		}
+
+		n.rules[rule.Table] = *rule
+	case netlinkAPI.Delete:
+		if _, found := n.rules[rule.Table]; !found {
+			return os.ErrNotExist
+		}
+
+		delete(n.rules, rule.Table)
 	}
-
-	n.rules[rule.Table] = *rule
-
-	return nil
-}
-
-func (n *NetLink) RuleDel(rule *netlink.Rule) error {
-	n.mutex.Lock()
-	defer n.mutex.Unlock()
-
-	if _, found := n.rules[rule.Table]; !found {
-		return os.ErrNotExist
-	}
-
-	delete(n.rules, rule.Table)
 
 	return nil
 }
